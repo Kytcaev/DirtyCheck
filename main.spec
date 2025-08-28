@@ -1,16 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_submodules
-
-hiddenimports = []
-hiddenimports += collect_submodules('checks')
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=hiddenimports,
+    datas=[('Summary of comments.xlsx', '.'), ('checks', 'checks')],
+    hiddenimports=['checks.check_cyrillic_filename', 'checks.check_cyrillic_pdf', 'checks.check_footer'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

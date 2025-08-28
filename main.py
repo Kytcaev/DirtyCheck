@@ -3,19 +3,40 @@ import importlib
 import datetime
 from openpyxl import load_workbook
 from tkinter import Tk, filedialog
+import sys
 
-CHECK_MODULES = [
+from openpyxl.cell.rich_text import CellRichText, TextBlock
+from openpyxl.cell.text import InlineFont
+
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+TEMPLATE_FILE = resource_path("Summary of comments.xlsx")
+OUTPUT_FILE = f"Summary_of_comments_{datetime.datetime.now().strftime('%Y%m%d')}.xlsx"
+
+# Модули разделены на проверки уровня файла и папки
+FILE_LEVEL_CHECKS = [
     "checks.check_cyrillic_filename",
     "checks.check_cyrillic_pdf",
+    "checks.check_footer",
+    "checks.check_comments",
+    "checks.check_duplicates",
+    "checks.check_standards",
 ]
 
-TEMPLATE_FILE = "Summary of comments.xlsx"
-OUTPUT_FILE = f"Summary_of_comments_{datetime.datetime.now().strftime('%Y%m%d')}.xlsx"
+FOLDER_LEVEL_CHECKS = [
+    "checks.check_package",
+]
 
 
 def find_first_empty_row(ws):
     """Ищем первую пустую строку в колонке B (код документа)"""
-    row = 2  # начинаем после заголовков
+    row = 2
     while ws.cell(row=row, column=2).value not in (None, ""):
         row += 1
     return row
@@ -34,7 +55,8 @@ def main():
     ws = wb.active
 
     # загружаем проверки
-    checks = [importlib.import_module(m) for m in CHECK_MODULES]
+    file_checks = [importlib.import_module(m) for m in FILE_LEVEL_CHECKS]
+    folder_checks = [importlib.import_module(m) for m in FOLDER_LEVEL_CHECKS]
 
     # собираем pdf
     files = []
@@ -49,15 +71,15 @@ def main():
     next_row = find_first_empty_row(ws)
     index = 1
 
+    # --- Проверки для каждого файла ---
     for file_path in files:
-        for check_module in checks:
+        for check_module in file_checks:
             results = check_module.check(file_path)
             for res in results:
-                # разные модули возвращают разный формат
-                if len(res) == 3:  # (код, comment_rich, author)
+                if len(res) == 3:
                     code, comment, author = res
                     page = None
-                else:              # (код, page, comment_rich, author)
+                else:
                     code, page, comment, author = res
 
                 ws.cell(row=next_row, column=1).value = index
@@ -70,7 +92,19 @@ def main():
                 next_row += 1
                 index += 1
 
-    wb.save(folder+"\\"+OUTPUT_FILE)
+    # --- Проверки для всей папки ---
+    for check_module in folder_checks:
+        results = check_module.check(folder, files)  # передаём папку и список файлов
+        for res in results:
+            code, comment, author = res
+            ws.cell(row=next_row, column=1).value = index
+            ws.cell(row=next_row, column=2).value = code
+            ws.cell(row=next_row, column=3).value = comment
+            ws.cell(row=next_row, column=4).value = author
+            next_row += 1
+            index += 1
+
+    wb.save(folder + "\\" + OUTPUT_FILE)
     print(f"Готово! Результаты сохранены в {OUTPUT_FILE}")
 
 

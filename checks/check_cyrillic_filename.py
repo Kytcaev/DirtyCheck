@@ -5,9 +5,9 @@ from openpyxl.cell.text import InlineFont
 
 
 def extract_code(filename):
-    """Извлекаем код PKS2 (40 символов)"""
-    return filename[:40] if filename.startswith("PKS2") else filename
-
+    """Берём код из имени файла целиком (без расширения), даже если длина ≠ 40."""
+    name, _ = os.path.splitext(os.path.basename(filename))
+    return name [:40] if filename.startswith("PKS2") else filename
 
 def check(file_path):
     """
