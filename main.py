@@ -5,10 +5,6 @@ from openpyxl import load_workbook
 from tkinter import Tk, filedialog
 import sys
 
-from openpyxl.cell.rich_text import CellRichText, TextBlock
-from openpyxl.cell.text import InlineFont
-
-
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     if hasattr(sys, '_MEIPASS'):
@@ -26,7 +22,7 @@ FILE_LEVEL_CHECKS = [
     "checks.check_footer",
     "checks.check_comments",
     "checks.check_duplicates",
-    "checks.check_standards",
+    "checks.check_standards",   # сюда подключен модуль стандартов
 ]
 
 FOLDER_LEVEL_CHECKS = [
@@ -74,7 +70,15 @@ def main():
     # --- Проверки для каждого файла ---
     for file_path in files:
         for check_module in file_checks:
-            results = check_module.check(file_path)
+            try:
+                results = check_module.check(file_path)
+            except Exception as e:
+                print(f"[Ошибка] {check_module.__name__}: {e}")
+                results = []
+
+            if not results:
+                continue
+
             for res in results:
                 if len(res) == 3:
                     code, comment, author = res
@@ -94,7 +98,12 @@ def main():
 
     # --- Проверки для всей папки ---
     for check_module in folder_checks:
-        results = check_module.check(folder, files)  # передаём папку и список файлов
+        try:
+            results = check_module.check(folder, files)
+        except Exception as e:
+            print(f"[Ошибка] {check_module.__name__}: {e}")
+            results = []
+
         for res in results:
             code, comment, author = res
             ws.cell(row=next_row, column=1).value = index
@@ -104,10 +113,19 @@ def main():
             next_row += 1
             index += 1
 
-    wb.save(folder + "\\" + OUTPUT_FILE)
-    print(f"Готово! Результаты сохранены в {OUTPUT_FILE}")
+    # сохраняем основной отчёт
+    out_path = os.path.join(folder, OUTPUT_FILE)
+    wb.save(out_path)
+    print(f"\nГотово! Результаты сохранены в {out_path}")
+
+    # --- отдельный отчёт по стандартам ---
+    try:
+        from checks import check_standards
+        check_standards.finalize(folder)
+    except Exception as e:
+        print(f"[Стандарты] не удалось сохранить отдельный отчёт: {e}")
 
 
 if __name__ == "__main__":
     main()
-input("\nГотово. Нажмите Enter, чтобы закрыть окно...")
+    input("\nГотово. Нажмите Enter, чтобы закрыть окно...")
